@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RETRO TREASURE MAZE</title>
+  <style>
+    :root {
+      --bg: #050805;
+      --green: #7cff6b;
+      --green2: #39d353;
+      --yellow: #ffd84d;
+      --red: #ff5a5f;
+      --cyan: #55e6ff;
+      --panel: #0b150c;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: radial-gradient(circle at center, #132313 0%, #050805 70%);
+      color: var(--green);
+      font-family: "Courier New", monospace;
+      overflow-x: hidden;
+      touch-action: none;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 12px;
+    }
+
+    .game-shell {
+      width: min(100%, 860px);
+      position: relative;
+      border: 4px solid var(--green2);
+      background: #020402;
+      box-shadow:
+        0 0 12px #39d353,
+        0 0 30px rgba(57,211,83,.35),
+        inset 0 0 30px rgba(57,211,83,.12);
+      overflow: hidden;
+    }
+
+    /* CRT 화면 굴곡 느낌 */
+    .game-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(255,255,255,.035) 0px,
+          rgba(255,255,255,.035) 1px,
+          transparent 2px,
+          transparent 4px
+        ),
+        radial-gradient(circle at center, transparent 48%, rgba(0,0,0,.42) 100%);
+      mix-blend-mode: screen;
+    }
+
+    /* CRT 깜빡임 */
+    .game-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 21;
+      background: rgba(100,255,120,.035);
+      animation: flicker .12s infinite alternate;
+    }
+
+    @keyframes flicker {
+      from { opacity: .20; }
+      to { opacity: .55; }
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      padding: 8px;
+      background: var(--panel);
+      border-bottom: 2px solid var(--green2);
+      font-size: clamp(11px, 2vw, 16px);
+      text-align: center;
+    }
+
+    .stat {
+      border: 1px solid #2f6d37;
+      padding: 5px 2px;
+      min-width: 0;
+    }
+
+    .stat b {
+      color: white;
+      display: block;
+      font-size: 1.05em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      background: #000;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .message {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 15;
+      min-width: min(85%, 520px);
+      padding: 18px;
+      border: 3px solid var(--yellow);
+      background: rgba(2,4,2,.94);
+      text-align: center;
+      color: white;
+      box-shadow: 0 0 20px rgba(255,216,77,.45);
+    }
+
+    .message h1, .message h2 {
+      margin: 0 0 10px;
+      color: var(--yellow);
+      text-shadow: 2px 2px #874d00;
+    }
+
+    .message p {
+      margin: 8px 0;
+      line-height: 1.45;
+    }
+
+    button {
+      font: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      border: 2px solid var(--green);
+      color: var(--green);
+      background: #061006;
+      padding: 10px 16px;
+      box-shadow: 3px 3px 0 #163d1c;
+    }
+
+    button:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 #163d1c;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 180px 1fr 150px;
+      gap: 10px;
+      padding: 10px;
+      border-top: 2px solid var(--green2);
+      background: #071007;
+    }
+
+    .dpad {
+      width: 170px;
+      display: grid;
+      grid-template-columns: repeat(3, 52px);
+      grid-template-rows: repeat(3, 52px);
+      gap: 4px;
+      justify-content: center;
+    }
+
+    .dpad button {
+      padding: 0;
+      font-size: 24px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .up { grid-column: 2; }
+    .left { grid-column: 1; grid-row: 2; }
+    .down { grid-column: 2; grid-row: 2; }
+    .right { grid-column: 3; grid-row: 2; }
+
+    .attack-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .attack-btn {
+      width: 128px;
+      height: 72px;
+      color: #ffdf66;
+      border-color: #ffdf66;
+      background: #2a1200;
+      box-shadow: 4px 4px 0 #6f3b00;
+      font-size: 18px;
+    }
+
+    .legend {
+      font-size: clamp(12px, 2vw, 15px);
+      line-height: 1.55;
+      align-self: center;
+    }
+
+    .legend span { white-space: nowrap; }
+    .tiny { opacity: .78; font-size: .9em; }
+
+    @media (max-width: 640px) {
+      body { padding: 0; align-items: stretch; }
+      .game-shell { border-width: 2px; min-height: 100vh; }
+      .topbar {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .controls {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+      .legend {
+        text-align: center;
+      }
+      .canvas-wrap {
+        aspect-ratio: 1 / 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell">
+    <section class="topbar">
+      <div class="stat">SCORE<b id="score">000000</b></div>
+      <div class="stat">LEVEL<b id="level">1</b></div>
+      <div class="stat">TIME<b id="time">60</b></div>
+      <div class="stat">TREASURE<b id="treasure">0/0</b></div>
+      <div class="stat">KEY<b id="keyState">NO</b></div>
+      <div class="stat">LIFE<b id="life">3</b></div>
+    </section>
+
+    <section class="canvas-wrap">
+      <canvas id="game" width="800" height="500"></canvas>
+
+      <div id="startScreen" class="message">
+        <h1>RETRO TREASURE MAZE</h1>
+        <p>보물을 모두 모으고 열쇠를 찾아 문을 여세요.</p>
+        <p>적에게 잡히거나 시간이 끝나기 전에 탈출해야 합니다.</p>
+        <p class="tiny">이동: 방향키 / WASD · 공격: Space / Enter / ATTACK</p>
+        <button id="startBtn">START GAME</button>
+      </div>
+
+      <div id="resultScreen" class="message" hidden>
+        <h2 id="resultTitle">GAME OVER</h2>
+        <p id="resultText"></p>
+        <button id="retryBtn">RESTART</button>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div class="dpad" aria-label="모바일 방향키">
+        <button class="up" data-dir="up">▲</button>
+        <button class="left" data-dir="left">◀</button>
+        <button class="down" data-dir="down">▼</button>
+        <button class="right" data-dir="right">▶</button>
+      </div>
+      <div class="legend">
+        <div><span>◆ 보물</span> · <span>♜ 열쇠</span> · <span>▣ 문</span> · <span>☠ 적</span></div>
+        <div>모든 보물을 모은 뒤 문에 도착하면 다음 레벨로 이동합니다.</div>
+        <div class="tiny">공격: Space / Enter / 모바일 ATTACK 버튼</div>
+      </div>
+      <div class="attack-wrap">
+        <button id="attackBtn" class="attack-btn">ATTACK</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    // =========================================================
+    // 기본 설정
+    // =========================================================
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    const ui = {
+      score: document.getElementById("score"),
+      level: document.getElementById("level"),
+      time: document.getElementById("time"),
+      treasure: document.getElementById("treasure"),
+      keyState: document.getElementById("keyState"),
+      life: document.getElementById("life"),
+      startScreen: document.getElementById("startScreen"),
+      resultScreen: document.getElementById("resultScreen"),
+      resultTitle: document.getElementById("resultTitle"),
+      resultText: document.getElementById("resultText")
+    };
+
+    const TILE = {
+      WALL: 1,
+      FLOOR: 0
+    };
+
+    let game = null;
+    let lastTime = 0;
+    let accumulator = 0;
+    const STEP = 1000 / 60;
+
+    // =========================================================
+    // 유틸리티 함수
+    // =========================================================
+    function randInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function samePos(a, b) {
+      return a.x === b.x && a.y === b.y;
+    }
+
+    function posKey(x, y) {
+      return `${x},${y}`;
+    }
+
+    // =========================================================
+    // 랜덤 미로 생성: 깊이 우선 탐색(DFS) 방식
+    // 홀수 좌표를 방으로 사용하고, 방 사이 벽을 뚫어 미로를 만든다.
+    // =========================================================
+    function generateMaze(width, height) {
+      const grid = Array.from({ length: height }, () =>
+        Array(width).fill(TILE.WALL)
+      );
+
+      const stack = [{ x: 1, y: 1 }];
+      grid[1][1] = TILE.FLOOR;
+
+      const dirs = [
+        { x: 0, y: -2 },
+        { x: 2, y: 0 },
+        { x: 0, y: 2 },
+        { x: -2, y: 0 }
+      ];
+
+      while (stack.length) {
+        const current = stack[stack.length - 1];
+        const choices = shuffle([...dirs]).filter(d => {
+          const nx = current.x + d.x;
+          const ny = current.y + d.y;
+          return nx > 0 && ny > 0 && nx < width - 1 && ny < height - 1 &&
+                 grid[ny][nx] === TILE.WALL;
+        });
+
+        if (!choices.length) {
+          stack.pop();
+          continue;
+        }
+
+        const d = choices[0];
+        const nx = current.x + d.x;
+        const ny = current.y + d.y;
+
+        grid[current.y + d.y / 2][current.x + d.x / 2] = TILE.FLOOR;
+        grid[ny][nx] = TILE.FLOOR;
+        stack.push({ x: nx, y: ny });
+      }
+
+      // 일부 벽을 추가로 제거하여 완전한 일방통행 미로가 아닌 순환 경로 생성
+      const extraOpenings = Math.floor(width * height * 0.025);
+      for (let i = 0; i < extraOpenings; i++) {
+        const x = randInt(1, width - 2);
+        const y = randInt(1, height - 2);
+
+        if (grid[y][x] === TILE.WALL) {
+          const horizontal = grid[y][x - 1] === TILE.FLOOR && grid[y][x + 1] === TILE.FLOOR;
+          const vertical = grid[y - 1][x] === TILE.FLOOR && grid[y + 1][x] === TILE.FLOOR;
+          if (horizontal || vertical) grid[y][x] = TILE.FLOOR;
+        }
+      }
+
+      return grid;
+    }
+
+    // =========================================================
+    // 빈 바닥 좌표 찾기
+    // =========================================================
+    function getFloorCells(grid) {
+      const cells = [];
+      for (let y = 1; y < grid.length - 1; y++) {
+        for (let x = 1; x < grid[0].length - 1; x++) {
+          if (grid[y][x] === TILE.FLOOR) cells.push({ x, y });
+        }
+      }
+      return cells;
+    }
+
+    function takeRandomCell(cells, blocked = new Set()) {
+      const candidates = cells.filter(p => !blocked.has(posKey(p.x, p.y)));
+      if (!candidates.length) return { x: 1, y: 1 };
+      return candidates[randInt(0, candidates.length - 1)];
+    }
+
+    // =========================================================
+    // 레벨 생성
+    // =========================================================
+    function createLevel(level, keepScore = 0, keepLife = 3) {
+      const mazeW = Math.min(31, 17 + Math.floor(level / 2) * 2);
+      const mazeH = Math.min(25, 13 + Math.floor(level / 3) * 2);
+      const grid = generateMaze(mazeW, mazeH);
+      const floorCells = getFloorCells(grid);
+      const blocked = new Set();
+
+      const player = {
+        x: 1,
+        y: 1,
+        moveCooldown: 0,
+        attackCooldown: 0,
+        attackFlash: 0,
+        invincible: 0,
+        facingX: 1,
+        facingY: 0
+      };
+      blocked.add(posKey(player.x, player.y));
+
+      // 출구는 시작점에서 대체로 먼 우하단 쪽 바닥으로 선택
+      const sortedByDistance = [...floorCells].sort((a, b) =>
+        (b.x + b.y) - (a.x + a.y)
+      );
+      const door = sortedByDistance[0];
+      blocked.add(posKey(door.x, door.y));
+
+      const key = takeRandomCell(floorCells, blocked);
+      blocked.add(posKey(key.x, key.y));
+
+      const treasureCount = Math.min(12, 4 + level);
+      const treasures = [];
+      for (let i = 0; i < treasureCount; i++) {
+        const p = takeRandomCell(floorCells, blocked);
+        blocked.add(posKey(p.x, p.y));
+        treasures.push({ ...p, collected: false });
+      }
+
+      const enemyCount = Math.min(8, 1 + Math.floor(level / 2));
+      const enemies = [];
+      for (let i = 0; i < enemyCount; i++) {
+        const p = takeRandomCell(floorCells, blocked);
+        blocked.add(posKey(p.x, p.y));
+        enemies.push({
+          x: p.x,
+          y: p.y,
+          moveTimer: randInt(0, 500),
+          speed: Math.max(180, 520 - level * 28),
+          lastX: p.x,
+          lastY: p.y
+        });
+      }
+
+      return {
+        running: true,
+        level,
+        score: keepScore,
+        life: keepLife,
+        timeLeft: Math.max(35, 65 - level * 2),
+        grid,
+        width: mazeW,
+        height: mazeH,
+        player,
+        door,
+        key,
+        hasKey: false,
+        treasures,
+        collected: 0,
+        enemies,
+        startedAt: performance.now()
+      };
+    }
+
+    // =========================================================
+    // 이동 / 충돌
+    // =========================================================
+    function canWalk(x, y) {
+      if (!game) return false;
+      if (x < 0 || y < 0 || x >= game.width || y >= game.height) return false;
+      return game.grid[y][x] === TILE.FLOOR;
+    }
+
+    function movePlayer(dx, dy) {
+      if (!game || !game.running || game.player.moveCooldown > 0) return;
+
+      game.player.facingX = dx;
+      game.player.facingY = dy;
+
+      const nx = game.player.x + dx;
+      const ny = game.player.y + dy;
+      if (!canWalk(nx, ny)) return;
+
+      game.player.x = nx;
+      game.player.y = ny;
+      game.player.moveCooldown = 70;
+
+      checkPickups();
+      checkDoor();
+      checkEnemyCollision();
+      updateUI();
+    }
+
+    // =========================================================
+    // 공격: 바라보는 방향 한 칸의 적을 처치한다.
+    // 처치 점수는 레벨에 따라 증가하며 짧은 재사용 대기시간이 있다.
+    // =========================================================
+    function attack() {
+      if (!game || !game.running || game.player.attackCooldown > 0) return;
+
+      game.player.attackCooldown = 280;
+      game.player.attackFlash = 130;
+
+      const tx = game.player.x + game.player.facingX;
+      const ty = game.player.y + game.player.facingY;
+      const before = game.enemies.length;
+
+      game.enemies = game.enemies.filter(enemy => !(enemy.x === tx && enemy.y === ty));
+
+      if (game.enemies.length < before) {
+        game.score += 200 * game.level;
+        flashMessage("ENEMY DOWN!", 450);
+        updateUI();
+      }
+    }
+
+    function checkPickups() {
+      // 보물 획득
+      for (const t of game.treasures) {
+        if (!t.collected && samePos(game.player, t)) {
+          t.collected = true;
+          game.collected++;
+          game.score += 100 * game.level;
+        }
+      }
+
+      // 열쇠 획득
+      if (!game.hasKey && samePos(game.player, game.key)) {
+        game.hasKey = true;
+        game.score += 250;
+      }
+    }
+
+    function checkDoor() {
+      if (!samePos(game.player, game.door)) return;
+
+      const allTreasure = game.collected === game.treasures.length;
+      if (game.hasKey && allTreasure) {
+        game.score += Math.floor(game.timeLeft) * 10 + 500 * game.level;
+        const nextLevel = game.level + 1;
+        const savedScore = game.score;
+        const savedLife = game.life;
+
+        game = createLevel(nextLevel, savedScore, savedLife);
+        flashMessage(`LEVEL ${nextLevel}`, 800);
+        updateUI();
+      } else {
+        // 문은 열쇠와 모든 보물이 있어야 열린다.
+        const missing = [];
+        if (!game.hasKey) missing.push("KEY");
+        if (!allTreasure) missing.push("TREASURE");
+        flashMessage(`NEED ${missing.join(" + ")}`, 650);
+      }
+    }
+
+    // =========================================================
+    // 적 AI
+    // 간단한 추적 AI: 플레이어와의 맨해튼 거리를 줄이는 방향 우선,
+    // 막히면 다른 가능한 방향으로 이동한다.
+    // =========================================================
+    function updateEnemies(dt) {
+      for (const enemy of game.enemies) {
+        enemy.moveTimer -= dt;
+        if (enemy.moveTimer > 0) continue;
+        enemy.moveTimer = enemy.speed;
+
+        const dirs = [
+          { x: 0, y: -1 },
+          { x: 1, y: 0 },
+          { x: 0, y: 1 },
+          { x: -1, y: 0 }
+        ];
+
+        let candidates = dirs
+          .map(d => ({
+            x: enemy.x + d.x,
+            y: enemy.y + d.y,
+            score: Math.abs((enemy.x + d.x) - game.player.x) +
+                   Math.abs((enemy.y + d.y) - game.player.y)
+          }))
+          .filter(p => canWalk(p.x, p.y))
+          .filter(p => !(p.x === enemy.lastX && p.y === enemy.lastY));
+
+        // 막다른 길에서는 이전 칸으로 돌아갈 수 있게 허용
+        if (!candidates.length) {
+          candidates = dirs
+            .map(d => ({
+              x: enemy.x + d.x,
+              y: enemy.y + d.y,
+              score: Math.abs((enemy.x + d.x) - game.player.x) +
+                     Math.abs((enemy.y + d.y) - game.player.y)
+            }))
+            .filter(p => canWalk(p.x, p.y));
+        }
+
+        if (!candidates.length) continue;
+
+        candidates.sort((a, b) => a.score - b.score);
+
+        // 레벨이 낮을 때는 약간 랜덤하게 움직여 난이도 완화
+        const chaseChance = Math.min(0.9, 0.58 + game.level * 0.04);
+        const next = Math.random() < chaseChance
+          ? candidates[0]
+          : candidates[randInt(0, candidates.length - 1)];
+
+        enemy.lastX = enemy.x;
+        enemy.lastY = enemy.y;
+        enemy.x = next.x;
+        enemy.y = next.y;
+      }
+    }
+
+    function checkEnemyCollision() {
+      if (game.player.invincible > 0) return;
+
+      const hit = game.enemies.some(e => samePos(e, game.player));
+      if (!hit) return;
+
+      game.life--;
+      game.player.invincible = 1500;
+      game.player.x = 1;
+      game.player.y = 1;
+      game.score = Math.max(0, game.score - 150);
+
+      if (game.life <= 0) {
+        endGame("GAME OVER", `최종 점수: ${game.score}`);
+      } else {
+        flashMessage("ENEMY HIT!", 700);
+      }
+    }
+
+    // =========================================================
+    // 게임 루프
+    // =========================================================
+    function update(dt) {
+      if (!game || !game.running) return;
+
+      game.player.moveCooldown = Math.max(0, game.player.moveCooldown - dt);
+      game.player.attackCooldown = Math.max(0, game.player.attackCooldown - dt);
+      game.player.attackFlash = Math.max(0, game.player.attackFlash - dt);
+      game.player.invincible = Math.max(0, game.player.invincible - dt);
+      game.timeLeft -= dt / 1000;
+
+      if (game.timeLeft <= 0) {
+        game.timeLeft = 0;
+        endGame("TIME OVER", `최종 점수: ${game.score}`);
+        return;
+      }
+
+      updateEnemies(dt);
+      checkEnemyCollision();
+      updateUI();
+    }
+
+    function loop(timestamp) {
+      const delta = Math.min(100, timestamp - lastTime);
+      lastTime = timestamp;
+      accumulator += delta;
+
+      while (accumulator >= STEP) {
+        update(STEP);
+        accumulator -= STEP;
+      }
+
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // =========================================================
+    // 픽셀아트 렌더링
+    // =========================================================
+    function draw() {
+      ctx.fillStyle = "#020302";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (!game) return;
+
+      const tileSize = Math.floor(Math.min(
+        canvas.width / game.width,
+        canvas.height / game.height
+      ));
+
+      const offsetX = Math.floor((canvas.width - game.width * tileSize) / 2);
+      const offsetY = Math.floor((canvas.height - game.height * tileSize) / 2);
+
+      // 미로
+      for (let y = 0; y < game.height; y++) {
+        for (let x = 0; x < game.width; x++) {
+          const px = offsetX + x * tileSize;
+          const py = offsetY + y * tileSize;
+
+          if (game.grid[y][x] === TILE.WALL) {
+            ctx.fillStyle = "#14351a";
+            ctx.fillRect(px, py, tileSize, tileSize);
+
+            ctx.fillStyle = "#245d2d";
+            ctx.fillRect(px + 2, py + 2, tileSize - 4, Math.max(2, tileSize / 5));
+
+            ctx.fillStyle = "#0a1d0e";
+            ctx.fillRect(px + tileSize - 3, py, 3, tileSize);
+            ctx.fillRect(px, py + tileSize - 3, tileSize, 3);
+          } else {
+            ctx.fillStyle = ((x + y) % 2 === 0) ? "#07120a" : "#09170c";
+            ctx.fillRect(px, py, tileSize, tileSize);
+          }
+        }
+      }
+
+      // 문
+      drawDoor(game.door.x, game.door.y, tileSize, offsetX, offsetY);
+
+      // 열쇠
+      if (!game.hasKey) {
+        drawKey(game.key.x, game.key.y, tileSize, offsetX, offsetY);
+      }
+
+      // 보물
+      for (const t of game.treasures) {
+        if (!t.collected) {
+          drawTreasure(t.x, t.y, tileSize, offsetX, offsetY);
+        }
+      }
+
+      // 적
+      for (const e of game.enemies) {
+        drawEnemy(e.x, e.y, tileSize, offsetX, offsetY);
+      }
+
+      // 공격 순간 바라보는 방향에 짧은 검격 효과 표시
+      if (game.player.attackFlash > 0) {
+        drawAttackEffect(tileSize, offsetX, offsetY);
+      }
+
+      // 플레이어: 피격 무적 중 깜빡임
+      if (game.player.invincible <= 0 || Math.floor(game.player.invincible / 100) % 2 === 0) {
+        drawPlayer(game.player.x, game.player.y, tileSize, offsetX, offsetY);
+      }
+    }
+
+    function cellRect(x, y, s, ox, oy) {
+      return { px: ox + x * s, py: oy + y * s };
+    }
+
+    function drawAttackEffect(s, ox, oy) {
+      const tx = game.player.x + game.player.facingX;
+      const ty = game.player.y + game.player.facingY;
+      const { px, py } = cellRect(tx, ty, s, ox, oy);
+
+      ctx.fillStyle = "#fff36a";
+      if (game.player.facingX !== 0) {
+        ctx.fillRect(px + s * .12, py + s * .42, s * .76, Math.max(3, s * .14));
+      } else {
+        ctx.fillRect(px + s * .42, py + s * .12, Math.max(3, s * .14), s * .76);
+      }
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(px + s * .38, py + s * .38, s * .24, s * .24);
+    }
+
+    function drawPlayer(x, y, s, ox, oy) {
+      const { px, py } = cellRect(x, y, s, ox, oy);
+      ctx.fillStyle = "#55e6ff";
+      ctx.fillRect(px + s * .22, py + s * .18, s * .56, s * .64);
+      ctx.fillStyle = "#e9ffff";
+      ctx.fillRect(px + s * .32, py + s * .28, s * .12, s * .12);
+      ctx.fillRect(px + s * .56, py + s * .28, s * .12, s * .12);
+      ctx.fillStyle = "#093f50";
+      ctx.fillRect(px + s * .3, py + s * .64, s * .15, s * .18);
+      ctx.fillRect(px + s * .55, py + s * .64, s * .15, s * .18);
+    }
+
+    function drawEnemy(x, y, s, ox, oy) {
+      const { px, py } = cellRect(x, y, s, ox, oy);
+      ctx.fillStyle = "#ff5a5f";
+      ctx.fillRect(px + s * .2, py + s * .22, s * .6, s * .58);
+      ctx.fillStyle = "#ffb0b2";
+      ctx.fillRect(px + s * .3, py + s * .35, s * .12, s * .12);
+      ctx.fillRect(px + s * .58, py + s * .35, s * .12, s * .12);
+      ctx.fillStyle = "#4f0003";
+      ctx.fillRect(px + s * .32, py + s * .37, s * .06, s * .06);
+      ctx.fillRect(px + s * .62, py + s * .37, s * .06, s * .06);
+      ctx.fillRect(px + s * .3, py + s * .65, s * .4, s * .08);
+    }
+
+    function drawTreasure(x, y, s, ox, oy) {
+      const { px, py } = cellRect(x, y, s, ox, oy);
+      ctx.fillStyle = "#ffd84d";
+      ctx.fillRect(px + s * .28, py + s * .28, s * .44, s * .44);
+      ctx.fillStyle = "#fff5a5";
+      ctx.fillRect(px + s * .4, py + s * .2, s * .2, s * .16);
+      ctx.fillStyle = "#9a6200";
+      ctx.fillRect(px + s * .45, py + s * .4, s * .1, s * .22);
+    }
+
+    function drawKey(x, y, s, ox, oy) {
+      const { px, py } = cellRect(x, y, s, ox, oy);
+      ctx.strokeStyle = "#fff36a";
+      ctx.lineWidth = Math.max(2, s * .12);
+      ctx.beginPath();
+      ctx.arc(px + s * .36, py + s * .4, s * .14, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(px + s * .46, py + s * .5);
+      ctx.lineTo(px + s * .75, py + s * .76);
+      ctx.lineTo(px + s * .68, py + s * .84);
+      ctx.moveTo(px + s * .62, py + s * .66);
+      ctx.lineTo(px + s * .54, py + s * .74);
+      ctx.stroke();
+    }
+
+    function drawDoor(x, y, s, ox, oy) {
+      const { px, py } = cellRect(x, y, s, ox, oy);
+      ctx.fillStyle = game.hasKey && game.collected === game.treasures.length
+        ? "#39d353"
+        : "#87521b";
+      ctx.fillRect(px + s * .18, py + s * .12, s * .64, s * .76);
+      ctx.fillStyle = "#2b1607";
+      ctx.fillRect(px + s * .3, py + s * .24, s * .4, s * .64);
+      ctx.fillStyle = "#ffd84d";
+      ctx.fillRect(px + s * .58, py + s * .55, s * .08, s * .08);
+    }
+
+    // =========================================================
+    // UI / 시작 / 종료
+    // =========================================================
+    function updateUI() {
+      if (!game) return;
+      ui.score.textContent = String(game.score).padStart(6, "0");
+      ui.level.textContent = game.level;
+      ui.time.textContent = Math.ceil(game.timeLeft);
+      ui.treasure.textContent = `${game.collected}/${game.treasures.length}`;
+      ui.keyState.textContent = game.hasKey ? "YES" : "NO";
+      ui.keyState.style.color = game.hasKey ? "#ffd84d" : "white";
+      ui.life.textContent = game.life;
+      ui.time.style.color = game.timeLeft <= 10 ? "#ff5a5f" : "white";
+    }
+
+    function startGame() {
+      game = createLevel(1, 0, 3);
+      ui.startScreen.hidden = true;
+      ui.resultScreen.hidden = true;
+      updateUI();
+    }
+
+    function endGame(title, text) {
+      if (!game) return;
+      game.running = false;
+      ui.resultTitle.textContent = title;
+      ui.resultText.textContent = text;
+      ui.resultScreen.hidden = false;
+    }
+
+    let flashTimer = null;
+    function flashMessage(text, duration) {
+      clearTimeout(flashTimer);
+
+      let box = document.getElementById("flashBox");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "flashBox";
+        box.style.position = "absolute";
+        box.style.left = "50%";
+        box.style.top = "12%";
+        box.style.transform = "translateX(-50%)";
+        box.style.zIndex = "14";
+        box.style.padding = "8px 16px";
+        box.style.border = "2px solid #ffd84d";
+        box.style.background = "rgba(0,0,0,.88)";
+        box.style.color = "#ffd84d";
+        box.style.fontWeight = "bold";
+        box.style.pointerEvents = "none";
+        document.querySelector(".canvas-wrap").appendChild(box);
+      }
+
+      box.textContent = text;
+      box.hidden = false;
+      flashTimer = setTimeout(() => box.hidden = true, duration);
+    }
+
+    // =========================================================
+    // 입력 처리: 키보드 + 모바일 버튼
+    // =========================================================
+    const keyMap = {
+      ArrowUp: [0, -1],
+      KeyW: [0, -1],
+      ArrowDown: [0, 1],
+      KeyS: [0, 1],
+      ArrowLeft: [-1, 0],
+      KeyA: [-1, 0],
+      ArrowRight: [1, 0],
+      KeyD: [1, 0]
+    };
+
+    window.addEventListener("keydown", e => {
+      if (e.code === "Space" || e.code === "Enter") {
+        e.preventDefault();
+        attack();
+        return;
+      }
+
+      const move = keyMap[e.code];
+      if (!move) return;
+      e.preventDefault();
+      movePlayer(move[0], move[1]);
+    }, { passive: false });
+
+    const dirMap = {
+      up: [0, -1],
+      down: [0, 1],
+      left: [-1, 0],
+      right: [1, 0]
+    };
+
+    document.querySelectorAll("[data-dir]").forEach(button => {
+      let repeatId = null;
+
+      const act = () => {
+        const [dx, dy] = dirMap[button.dataset.dir];
+        movePlayer(dx, dy);
+      };
+
+      const start = e => {
+        e.preventDefault();
+        act();
+        repeatId = setInterval(act, 110);
+      };
+
+      const stop = () => {
+        clearInterval(repeatId);
+        repeatId = null;
+      };
+
+      button.addEventListener("pointerdown", start);
+      button.addEventListener("pointerup", stop);
+      button.addEventListener("pointerleave", stop);
+      button.addEventListener("pointercancel", stop);
+    });
+
+    document.getElementById("startBtn").addEventListener("click", startGame);
+    document.getElementById("retryBtn").addEventListener("click", startGame);
+    document.getElementById("attackBtn").addEventListener("pointerdown", e => {
+      e.preventDefault();
+      attack();
+    });
+
+    // 캔버스 내부 해상도는 CSS 크기에 맞게 조절한다.
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.max(320, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(320, Math.floor(rect.height * dpr));
+      ctx.imageSmoothingEnabled = false;
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
